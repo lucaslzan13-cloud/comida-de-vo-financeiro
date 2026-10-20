@@ -1,10 +1,9 @@
 package com.comidadevo.financeiro;
 
 import android.content.Context;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.api.client.extensions.android.http.AndroidHttp;
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 import com.google.api.client.http.ByteArrayContent;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
@@ -23,11 +22,11 @@ public class SyncManager {
 
     public SyncManager(Context c){context=c.getApplicationContext();db=new FinanceDb(context);}
 
-    public void sync(GoogleSignInAccount account) throws Exception {
-        if(account==null) throw new IllegalStateException("Conta Google não conectada");
-        GoogleAccountCredential credential=GoogleAccountCredential.usingOAuth2(
-                context, Collections.singleton(com.google.api.services.drive.DriveScopes.DRIVE_FILE));
-        credential.setSelectedAccount(account.getAccount());
+    public void sync(String accessToken) throws Exception {
+        if(accessToken==null || accessToken.trim().isEmpty())
+            throw new IllegalStateException("Token Google inválido");
+
+        GoogleCredential credential=new GoogleCredential().setAccessToken(accessToken);
         Drive drive=new Drive.Builder(
                 AndroidHttp.newCompatibleTransport(),
                 GsonFactory.getDefaultInstance(),
@@ -39,7 +38,7 @@ public class SyncManager {
         if(folder==null){
             File meta=new File().setName(FOLDER_NAME).setMimeType(FOLDER_MIME)
                     .setParents(Collections.singletonList("root"));
-            folder=drive.files().create(meta).setFields("id,name").execute();
+            folder=drive.files().create(meta).setFields("id,name,parents").execute();
         }
 
         File remote=findBackupFile(drive,folder.getId());
@@ -115,7 +114,7 @@ public class SyncManager {
         JSONObject o=new JSONObject();
         o.put("id",e.id);o.put("type",e.type);o.put("amount",e.amount);
         o.put("category",e.category);o.put("date",e.date);
-        o.put("description",e.description);o.put("updatedAt",e.updatedAt);
+        o.put("description",e.description==null?"":e.description);o.put("updatedAt",e.updatedAt);
         o.put("deleted",e.deleted);
         return o;
     }
